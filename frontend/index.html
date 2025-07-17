@@ -1,0 +1,2619 @@
+
+<input type="number" id="year" value="2024" min="2020" max="2030">
+
+<input type="text" id="country" value="Norway" placeholder="e.g., Norway, Iceland, Canada">
+
+<select id="gear">
+  <option value="Trawl">Trawl</option>
+  <option value="Longline">Longline</option>
+  <!-- etc... -->
+</select>
+
+<input type="text" id="lat" value="69.6" placeholder="e.g., 69.6">
+
+<input type="text" id="lon" value="18.9" placeholder="e.g., 18.9">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaPredict - Advanced Fisheries Analytics Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0c1426 0%, #1a2332 25%, #0f172a 50%, #020617 100%);
+            min-height: 100vh;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 25% 25%, rgba(6, 182, 212, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(14, 165, 233, 0.06) 0%, transparent 50%),
+                linear-gradient(90deg, rgba(6, 182, 212, 0.02) 1px, transparent 1px),
+                linear-gradient(rgba(6, 182, 212, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .glass-card {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(6, 182, 212, 0.15);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+        
+        .glass-card:hover {
+            border-color: rgba(6, 182, 212, 0.25);
+            box-shadow: 
+                0 12px 40px rgba(6, 182, 212, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        
+        .nav-glass {
+            background: rgba(2, 6, 23, 0.95);
+            backdrop-filter: blur(24px);
+            border-bottom: 1px solid rgba(6, 182, 212, 0.2);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+        
+        .nav-item {
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 500;
+            letter-spacing: 0.025em;
+        }
+        
+        .nav-item:hover {
+            color: #06b6d4;
+            background: rgba(6, 182, 212, 0.08);
+        }
+        
+        .nav-item.active {
+            color: #06b6d4;
+            background: rgba(6, 182, 212, 0.12);
+        }
+        
+        .nav-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #06b6d4, transparent);
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.6), transparent);
+            transition: left 0.6s ease;
+        }
+        
+        .metric-card:hover::before {
+            left: 100%;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(6, 182, 212, 0.4);
+            box-shadow: 
+                0 20px 40px rgba(6, 182, 212, 0.1),
+                0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            position: relative;
+        }
+        
+        .status-dot::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-online { background: #10b981; }
+        .status-online::after { background: #10b981; }
+        .status-warning { background: #f59e0b; }
+        .status-warning::after { background: #f59e0b; }
+        .status-offline { background: #ef4444; }
+        .status-offline::after { background: #ef4444; }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.3; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        
+        .ocean-button {
+            background: linear-gradient(135deg, #0891b2 0%, #0e7490 50%, #155e75 100%);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            letter-spacing: 0.025em;
+        }
+        
+        .ocean-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .ocean-button:hover::before {
+            left: 100%;
+        }
+        
+        .ocean-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(6, 182, 212, 0.25);
+            border-color: rgba(6, 182, 212, 0.5);
+        }
+        
+        .section {
+            display: none;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .section.active {
+            display: block;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 320px;
+            width: 100%;
+        }
+        
+        .data-badge {
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            color: #06b6d4;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 50%, #0e7490 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero-glow {
+            position: relative;
+        }
+        
+        .hero-glow::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, transparent 70%);
+            z-index: -1;
+        }
+        
+        .floating {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .tech-grid {
+            background: 
+                linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        .ocean-icon {
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+            box-shadow: 0 8px 24px rgba(6, 182, 212, 0.3);
+        }
+        
+        .data-visualization {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(6, 182, 212, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .performance-indicator {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .performance-indicator::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(180deg, #10b981 0%, #06b6d4 100%);
+        }
+        
+        .chart-tab-btn {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            color: #94a3b8;
+            transition: all 0.3s ease;
+        }
+        
+        .chart-tab-btn:hover {
+            background: rgba(6, 182, 212, 0.1);
+            border-color: rgba(6, 182, 212, 0.4);
+            color: #06b6d4;
+        }
+        
+        .chart-tab-btn.active {
+            background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+            border-color: rgba(6, 182, 212, 0.5);
+            color: white;
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+        }
+        
+        .chart-panel {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        .chart-panel.active {
+            display: block;
+        }
+        
+        .vessel-marker {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .vessel-marker:hover {
+            transform: scale(1.2) !important;
+            z-index: 20;
+        }
+        
+        .vessel-marker:hover .absolute {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .vessel-marker .absolute {
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .vessel-marker:hover .absolute {
+            opacity: 1;
+            visibility: visible;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 nav-glass">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-4">
+                    <div class="ocean-icon w-10 h-10 rounded-xl flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-white font-bold text-xl tracking-tight">
+                            Aqua<span class="gradient-text">Predict</span>
+                        </h1>
+                        <div class="flex items-center space-x-2">
+                            <span class="status-dot status-online"></span>
+                            <span class="text-xs text-cyan-400 font-medium tracking-wide">LIVE SYSTEM</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="hidden lg:flex items-center space-x-1">
+                    <button onclick="showSection('home')" class="nav-item px-4 py-2 rounded-lg text-slate-300">Dashboard</button>
+                    <button onclick="showSection('analytics')" class="nav-item px-4 py-2 rounded-lg text-slate-300">Analytics</button>
+                    <button onclick="showSection('zones')" class="nav-item px-4 py-2 rounded-lg text-slate-300">Fishing Zones</button>
+                    <button onclick="showSection('weather')" class="nav-item px-4 py-2 rounded-lg text-slate-300">Ocean Data</button>
+                    <button onclick="showSection('reports')" class="nav-item px-4 py-2 rounded-lg text-slate-300">Export</button>
+                    <button onclick="showSection('about')" class="nav-item px-4 py-2 rounded-lg text-slate-300">System & Contact</button>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <div class="hidden md:flex items-center space-x-2 text-sm">
+                        <span class="status-dot status-online"></span>
+                        <span class="text-slate-400">Last sync: 1m ago</span>
+                    </div>
+                    <button class="lg:hidden text-slate-300" onclick="toggleMobileMenu()">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobileMenu" class="hidden lg:hidden nav-glass border-t border-cyan-500/20">
+            <div class="px-4 py-3 space-y-1">
+                <button onclick="showSection('home')" class="nav-item block w-full text-left px-3 py-2 rounded-lg text-slate-300">Dashboard</button>
+                <button onclick="showSection('analytics')" class="nav-item block w-full text-left px-3 py-2 rounded-lg text-slate-300">Analytics</button>
+                <button onclick="showSection('zones')" class="nav-item block w-full text-left px-3 py-2 rounded-lg text-slate-300">Fishing Zones</button>
+                <button onclick="showSection('weather')" class="nav-item block w-full text-left px-3 py-2 rounded-lg text-slate-300">Ocean Data</button>
+                <button onclick="showSection('reports')" class="nav-item block w-full text-left px-3 py-2 rounded-lg text-slate-300">Export</button>
+                <button onclick="showSection('about')" class="nav-item block w-full text-left px-3 py-2 rounded-lg text-slate-300">System Info</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="pt-16">
+        <!-- Dashboard Home -->
+        <section id="home" class="section active min-h-screen">
+            <!-- Hero Section -->
+            <div class="hero-glow py-20 px-6">
+                <div class="max-w-6xl mx-auto text-center">
+                    <div class="floating mb-8">
+                        <div class="ocean-icon w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                            <svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <h1 class="text-5xl lg:text-7xl font-bold text-white mb-6 tracking-tight">
+                        Advanced Fisheries
+                        <span class="gradient-text block">Intelligence Platform</span>
+                    </h1>
+                    
+                    <p class="text-xl text-slate-300 mb-8 max-w-3xl mx-auto leading-relaxed">
+                        Harness the power of AI-driven oceanographic analysis, real-time environmental monitoring, 
+                        and predictive modeling to optimize fishing operations with unprecedented precision.
+                    </p>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+                        <button onclick="showSection('analytics')" class="ocean-button px-8 py-4 rounded-xl text-white text-lg">
+                            <span class="relative z-10">Launch Analytics Suite</span>
+                        </button>
+                        <div class="flex items-center space-x-6 text-sm">
+                            <div class="flex items-center">
+                                <span class="status-dot status-online"></span>
+                                <span class="text-slate-400 font-medium">Real-time Processing</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="status-dot status-online"></span>
+                                <span class="text-slate-400 font-medium">AI Predictions Active</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Key Performance Indicators -->
+            <div class="px-6 pb-20">
+                <div class="max-w-7xl mx-auto">
+                    <div class="text-center mb-12">
+                        <h2 class="text-3xl font-bold text-white mb-4">System Performance Overview</h2>
+                        <p class="text-slate-400 text-lg">Real-time metrics from our advanced analytics engine</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="metric-card rounded-2xl p-6 performance-indicator">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                                    </svg>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">+15.3%</span>
+                            </div>
+                            <h3 class="text-3xl font-bold text-white mb-2">96.7%</h3>
+                            <p class="text-slate-400 font-medium">Prediction Accuracy</p>
+                            <p class="text-xs text-cyan-400 mt-1">Machine Learning Model</p>
+                        </div>
+                        
+                        <div class="metric-card rounded-2xl p-6 performance-indicator">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
+                                    </svg>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">+28.4%</span>
+                            </div>
+                            <h3 class="text-3xl font-bold text-white mb-2">$2.4M</h3>
+                            <p class="text-slate-400 font-medium">Revenue Optimization</p>
+                            <p class="text-xs text-cyan-400 mt-1">Annual Impact</p>
+                        </div>
+                        
+                        <div class="metric-card rounded-2xl p-6 performance-indicator">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    </svg>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">Active</span>
+                            </div>
+                            <h3 class="text-3xl font-bold text-white mb-2">47</h3>
+                            <p class="text-slate-400 font-medium">Monitoring Zones</p>
+                            <p class="text-xs text-cyan-400 mt-1">Coastal Coverage</p>
+                        </div>
+                        
+                        <div class="metric-card rounded-2xl p-6 performance-indicator">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">Live</span>
+                            </div>
+                            <h3 class="text-3xl font-bold text-white mb-2">24/7</h3>
+                            <p class="text-slate-400 font-medium">Data Processing</p>
+                            <p class="text-xs text-cyan-400 mt-1">Real-time Analytics</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Analytics Section -->
+        <section id="analytics" class="section min-h-screen py-12 px-6">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 class="text-4xl font-bold text-white mb-3">Fisheries Analytics Dashboard</h2>
+                        <p class="text-slate-400 text-lg">Advanced predictive modeling and performance insights</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="status-dot status-online"></span>
+                        <span class="text-slate-300 font-medium">System Status: Operational</span>
+                    </div>
+                </div>
+                
+                <!-- User Configuration Panel -->
+                <div class="glass-card rounded-2xl p-8 mb-8">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="text-2xl font-semibold text-white mb-2">Fishing Operation Configuration</h3>
+                            <p class="text-slate-400">Enter your specific parameters for AI-powered predictions</p>
+                        </div>
+                        <div id="configStatus">
+                            <div class="flex items-center space-x-3">
+                                <span class="status-dot status-warning"></span>
+                                <span class="text-slate-300 font-medium">Ready for Configuration</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-3">Target Year</label>
+                            <input type="number" id="year" value="2024" min="2020" max="2030" 
+                                   class="w-full bg-slate-800/50 border border-cyan-500/30 rounded-xl px-4 py-3 text-white placeholder-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-3">Country/Region</label>
+                            <select id="country" class="w-full bg-slate-800/50 border border-cyan-500/30 rounded-xl px-4 py-3 text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all">
+                                <option value="Norway">Norway</option>
+                                <option value="Iceland">Iceland</option>
+                                <option value="Canada">Canada</option>
+                                <option value="Alaska">Alaska</option>
+                                <option value="Scotland">Scotland</option>
+                                <option value="Finland">Finland</option>
+                                <option value="Sweden">Sweden</option>
+                                <option value="Denmark">Denmark</option>
+                                <option value="Greenland">Greenland</option>
+                                <option value="Faroe Islands">Faroe Islands</option>
+                                <option value="India">India</option>
+                                <option value="Japan">Japan</option>
+                                <option value="Chile">Chile</option>
+                                <option value="New Zealand">New Zealand</option>
+                                <option value="Australia">Australia</option>
+                                <option value="Russia">Russia</option>
+                                <option value="United Kingdom">United Kingdom</option>
+                                <option value="Ireland">Ireland</option>
+                                <option value="Portugal">Portugal</option>
+                                <option value="Spain">Spain</option>
+                                <option value="France">France</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-3">Gear Type</label>
+                            <select id="gear" class="w-full bg-slate-800/50 border border-cyan-500/30 rounded-xl px-4 py-3 text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all">
+                                <option value="Trawl">Trawl</option>
+                                <option value="Longline">Longline</option>
+                                <option value="Gillnet">Gillnet</option>
+                                <option value="Purse Seine">Purse Seine</option>
+                                <option value="Trap">Trap/Pot</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-3">Latitude</label>
+                            <input type="text" id="lat" value="69.6" placeholder="e.g., 69.6"
+                                   class="w-full bg-slate-800/50 border border-cyan-500/30 rounded-xl px-4 py-3 text-white placeholder-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-3">Longitude</label>
+                            <input type="text" id="lon" value="18.9" placeholder="e.g., 18.9"
+                                   class="w-full bg-slate-800/50 border border-cyan-500/30 rounded-xl px-4 py-3 text-white placeholder-slate-400 focus:ring-2 focus:ring-cyan-400/20 transition-all">
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4 text-sm text-slate-400">
+                            <div class="flex items-center">
+                                <span class="status-dot status-online"></span>
+                                <span>AI Model Ready</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="status-dot status-online"></span>
+                                <span>Real-time Processing</span>
+                            </div>
+                        </div>
+                        <button onclick="updatePredictions()" class="ocean-button px-8 py-3 rounded-xl text-white font-semibold">
+                            <span class="relative z-10">Generate Predictions</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Real-time Metrics Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <span class="data-badge px-3 py-1 rounded-full">Today</span>
+                        </div>
+                        <h3 id="dailyCatch" class="text-2xl font-bold text-white mb-1">1,847 kg</h3>
+                        <p class="text-slate-400 text-sm font-medium">Predicted Daily Catch</p>
+                        <div class="mt-3 flex items-center text-xs">
+                            <span id="catchTrend" class="text-emerald-400">↗ +12.3%</span>
+                            <span class="text-slate-500 ml-2">vs yesterday</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <span class="data-badge px-3 py-1 rounded-full">ML Model</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-1">96.7%</h3>
+                        <p class="text-slate-400 text-sm font-medium">Prediction Confidence</p>
+                        <div class="mt-3 flex items-center text-xs">
+                            <span class="text-emerald-400">↗ +2.1%</span>
+                            <span class="text-slate-500 ml-2">model improvement</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                                </svg>
+                            </div>
+                            <span class="data-badge px-3 py-1 rounded-full">Optimal</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-1">Excellent</h3>
+                        <p class="text-slate-400 text-sm font-medium">Weather Conditions</p>
+                        <div class="mt-3 flex items-center text-xs">
+                            <span class="text-cyan-400">22°C</span>
+                            <span class="text-slate-500 ml-2">sea temperature</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <span class="data-badge px-3 py-1 rounded-full">Live</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-1">Real-time</h3>
+                        <p class="text-slate-400 text-sm font-medium">Data Synchronization</p>
+                        <div class="mt-3 flex items-center text-xs">
+                            <span class="text-emerald-400">● Connected</span>
+                            <span class="text-slate-500 ml-2">all sensors</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-xl font-semibold text-white">Weekly Catch Predictions</h3>
+                            <div class="flex items-center space-x-2">
+                                <span class="status-dot status-online"></span>
+                                <span class="text-xs text-slate-400 font-medium">Updated 2m ago</span>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="weeklyChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-xl font-semibold text-white">Species Distribution Analysis</h3>
+                            <div class="flex items-center space-x-2">
+                                <span class="status-dot status-online"></span>
+                                <span class="text-xs text-slate-400 font-medium">Live data</span>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="speciesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Fishing Zones Section -->
+        <section id="zones" class="section min-h-screen py-12 px-6">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 class="text-4xl font-bold text-white mb-3">Intelligent Fishing Zone Management</h2>
+                        <p class="text-slate-400 text-lg">Real-time monitoring and optimization of coastal fishing areas</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="status-dot status-online"></span>
+                        <span class="text-slate-300 font-medium">GPS Tracking: Active</span>
+                    </div>
+                </div>
+                
+                <!-- Interactive Analytics Dashboard -->
+                <div class="glass-card rounded-2xl p-8 mb-8">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h3 class="text-2xl font-bold text-white mb-2">Intelligent Coastal Catch Forecasting System</h3>
+                            <p class="text-slate-400">Harnessing real-time environmental, weather, and geolocation data to optimize fish catch predictions, zone performance, and sustainable fishing decisions.</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <button onclick="switchChart('performance')" id="btn-performance" class="chart-tab-btn active px-4 py-2 rounded-lg text-sm font-medium">Performance</button>
+                            <button onclick="switchChart('livemap')" id="btn-livemap" class="chart-tab-btn px-4 py-2 rounded-lg text-sm font-medium">Live Map</button>
+                            <button onclick="switchChart('species')" id="btn-species" class="chart-tab-btn px-4 py-2 rounded-lg text-sm font-medium">Species</button>
+                            <button onclick="switchChart('trends')" id="btn-trends" class="chart-tab-btn px-4 py-2 rounded-lg text-sm font-medium">Trends</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Performance Bar Chart -->
+                    <div id="chart-performance" class="chart-panel active">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div class="data-visualization rounded-xl p-6">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h4 class="text-lg font-semibold text-white">Weekly Catch Performance</h4>
+                                    <span class="data-badge px-3 py-1 rounded-full">Live Data</span>
+                                </div>
+                                <div class="chart-container h-64">
+                                    <canvas id="performanceBarChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="data-visualization rounded-xl p-6">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h4 class="text-lg font-semibold text-white">Prediction Accuracy</h4>
+                                    <span class="data-badge px-3 py-1 rounded-full">96.7%</span>
+                                </div>
+                                <div class="chart-container h-64">
+                                    <canvas id="accuracyGaugeChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Live Vessel Tracking Map -->
+                    <div id="chart-livemap" class="chart-panel">
+                        <div class="data-visualization rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <h4 class="text-lg font-semibold text-white">Real-time Vessel & Zone Tracking</h4>
+                                <div class="flex items-center space-x-4">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></div>
+                                        <span class="text-xs text-slate-400">Active Vessels</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-3 h-3 rounded-full bg-cyan-400"></div>
+                                        <span class="text-xs text-slate-400">Optimal Zones</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-3 h-3 rounded-full bg-amber-400"></div>
+                                        <span class="text-xs text-slate-400">Weather Alerts</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="relative h-80 bg-slate-900/50 rounded-lg overflow-hidden" id="liveMapContainer">
+                                <!-- Simulated Map Background -->
+                                <div class="absolute inset-0 bg-gradient-to-br from-blue-900/30 via-cyan-900/20 to-emerald-900/30"></div>
+                                
+                                <!-- Grid Lines for Map Effect -->
+                                <div class="absolute inset-0 opacity-20">
+                                    <div class="grid grid-cols-8 grid-rows-6 h-full w-full">
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                        <div class="border border-cyan-500/30"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Fishing Zones -->
+                                <div class="absolute top-4 left-8 w-20 h-16 bg-emerald-400/30 border-2 border-emerald-400 rounded-lg flex items-center justify-center">
+                                    <span class="text-xs font-bold text-emerald-400">Zone A-7</span>
+                                </div>
+                                
+                                <div class="absolute top-12 right-12 w-24 h-20 bg-cyan-400/30 border-2 border-cyan-400 rounded-lg flex items-center justify-center">
+                                    <span class="text-xs font-bold text-cyan-400">Zone B-3</span>
+                                </div>
+                                
+                                <div class="absolute bottom-16 left-16 w-18 h-14 bg-blue-400/30 border-2 border-blue-400 rounded-lg flex items-center justify-center">
+                                    <span class="text-xs font-bold text-blue-400">Zone C-12</span>
+                                </div>
+                                
+                                <div class="absolute bottom-8 right-20 w-22 h-18 bg-amber-400/30 border-2 border-amber-400 rounded-lg flex items-center justify-center">
+                                    <span class="text-xs font-bold text-amber-400">Zone D-5</span>
+                                </div>
+                                
+                                <!-- Active Vessels -->
+                                <div class="vessel-marker absolute top-8 left-12" style="animation: float 3s ease-in-out infinite;">
+                                    <div class="w-4 h-4 bg-emerald-400 rounded-full shadow-lg relative">
+                                        <div class="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-75"></div>
+                                        <div class="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-slate-800 text-emerald-400 text-xs px-2 py-1 rounded whitespace-nowrap">
+                                            Vessel Alpha
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="vessel-marker absolute top-16 right-16" style="animation: float 4s ease-in-out infinite 1s;">
+                                    <div class="w-4 h-4 bg-cyan-400 rounded-full shadow-lg relative">
+                                        <div class="absolute inset-0 bg-cyan-400 rounded-full animate-ping opacity-75"></div>
+                                        <div class="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-slate-800 text-cyan-400 text-xs px-2 py-1 rounded whitespace-nowrap">
+                                            Vessel Beta
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="vessel-marker absolute bottom-20 left-20" style="animation: float 3.5s ease-in-out infinite 0.5s;">
+                                    <div class="w-4 h-4 bg-blue-400 rounded-full shadow-lg relative">
+                                        <div class="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-75"></div>
+                                        <div class="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-slate-800 text-blue-400 text-xs px-2 py-1 rounded whitespace-nowrap">
+                                            Vessel Gamma
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="vessel-marker absolute bottom-12 right-24" style="animation: float 4.5s ease-in-out infinite 2s;">
+                                    <div class="w-4 h-4 bg-purple-400 rounded-full shadow-lg relative">
+                                        <div class="absolute inset-0 bg-purple-400 rounded-full animate-ping opacity-75"></div>
+                                        <div class="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-slate-800 text-purple-400 text-xs px-2 py-1 rounded whitespace-nowrap">
+                                            Vessel Delta
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Weather Alert -->
+                                <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                                    <div class="w-8 h-8 bg-amber-400/20 border-2 border-amber-400 rounded-full flex items-center justify-center animate-pulse">
+                                        <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                                        </svg>
+                                    </div>
+                                    <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-amber-400 text-xs px-2 py-1 rounded whitespace-nowrap">
+                                        Storm Warning
+                                    </div>
+                                </div>
+                                
+                                <!-- Coordinates Display -->
+                                <div class="absolute bottom-2 left-2 bg-slate-800/80 text-cyan-400 text-xs px-3 py-1 rounded">
+                                    <span id="mapCoordinates">69.6°N, 18.9°E</span>
+                                </div>
+                                
+                                <!-- Live Data Indicator -->
+                                <div class="absolute top-2 right-2 flex items-center space-x-2 bg-slate-800/80 px-3 py-1 rounded">
+                                    <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                                    <span class="text-xs text-emerald-400 font-medium">LIVE</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Species Distribution -->
+                    <div id="chart-species" class="chart-panel">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div class="data-visualization rounded-xl p-6">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h4 class="text-lg font-semibold text-white">Species Distribution</h4>
+                                    <span class="data-badge px-3 py-1 rounded-full">6 Species</span>
+                                </div>
+                                <div class="chart-container h-64">
+                                    <canvas id="speciesPieChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="data-visualization rounded-xl p-6">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h4 class="text-lg font-semibold text-white">Catch Volume by Species</h4>
+                                    <span class="data-badge px-3 py-1 rounded-full">Monthly</span>
+                                </div>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-4 h-4 rounded bg-cyan-400"></div>
+                                            <span class="text-white font-medium">Tuna</span>
+                                        </div>
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-32 bg-slate-700 rounded-full h-2">
+                                                <div class="bg-cyan-400 h-2 rounded-full" style="width: 85%"></div>
+                                            </div>
+                                            <span class="text-slate-300 text-sm w-12">2,840kg</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-4 h-4 rounded bg-blue-400"></div>
+                                            <span class="text-white font-medium">Salmon</span>
+                                        </div>
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-32 bg-slate-700 rounded-full h-2">
+                                                <div class="bg-blue-400 h-2 rounded-full" style="width: 72%"></div>
+                                            </div>
+                                            <span class="text-slate-300 text-sm w-12">2,410kg</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-4 h-4 rounded bg-emerald-400"></div>
+                                            <span class="text-white font-medium">Cod</span>
+                                        </div>
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-32 bg-slate-700 rounded-full h-2">
+                                                <div class="bg-emerald-400 h-2 rounded-full" style="width: 58%"></div>
+                                            </div>
+                                            <span class="text-slate-300 text-sm w-12">1,950kg</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-4 h-4 rounded bg-purple-400"></div>
+                                            <span class="text-white font-medium">Mackerel</span>
+                                        </div>
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-32 bg-slate-700 rounded-full h-2">
+                                                <div class="bg-purple-400 h-2 rounded-full" style="width: 45%"></div>
+                                            </div>
+                                            <span class="text-slate-300 text-sm w-12">1,520kg</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-4 h-4 rounded bg-yellow-400"></div>
+                                            <span class="text-white font-medium">Sardines</span>
+                                        </div>
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-32 bg-slate-700 rounded-full h-2">
+                                                <div class="bg-yellow-400 h-2 rounded-full" style="width: 38%"></div>
+                                            </div>
+                                            <span class="text-slate-300 text-sm w-12">1,280kg</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-4 h-4 rounded bg-orange-400"></div>
+                                            <span class="text-white font-medium">Others</span>
+                                        </div>
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-32 bg-slate-700 rounded-full h-2">
+                                                <div class="bg-orange-400 h-2 rounded-full" style="width: 25%"></div>
+                                            </div>
+                                            <span class="text-slate-300 text-sm w-12">840kg</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Trends Analysis -->
+                    <div id="chart-trends" class="chart-panel">
+                        <div class="data-visualization rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <h4 class="text-lg font-semibold text-white">Environmental Trends & Catch Correlation</h4>
+                                <div class="flex items-center space-x-2">
+                                    <span class="status-dot status-online"></span>
+                                    <span class="text-xs text-slate-400 font-medium">Real-time correlation</span>
+                                </div>
+                            </div>
+                            <div class="chart-container h-80">
+                                <canvas id="trendsLineChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Zone Status Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="status-dot status-online"></span>
+                            <span class="data-badge px-3 py-1 rounded-full">Prime</span>
+                        </div>
+                        <h4 id="primaryZone" class="text-lg font-semibold text-white mb-2">Zone Alpha-7</h4>
+                        <p class="text-emerald-400 text-sm font-medium mb-3">Optimal Conditions Detected</p>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Location:</span>
+                                <span id="zoneLocation" class="text-white font-medium">69.6°N, 18.9°E</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Yield Prediction:</span>
+                                <span class="text-white font-medium">High (94%)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Water Temp:</span>
+                                <span class="text-white font-medium">22.4°C</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Gear Compatibility:</span>
+                                <span id="gearMatch" class="text-white font-medium">Excellent</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="status-dot status-warning"></span>
+                            <span class="data-badge px-3 py-1 rounded-full">Moderate</span>
+                        </div>
+                        <h4 class="text-lg font-semibold text-white mb-2">Zone Beta-3</h4>
+                        <p class="text-amber-400 text-sm font-medium mb-3">Weather Dependent</p>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Yield Prediction:</span>
+                                <span class="text-white font-medium">Medium (67%)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Water Temp:</span>
+                                <span class="text-white font-medium">19.8°C</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Current:</span>
+                                <span class="text-white font-medium">Variable</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="status-dot status-online"></span>
+                            <span class="data-badge px-3 py-1 rounded-full">Active</span>
+                        </div>
+                        <h4 class="text-lg font-semibold text-white mb-2">Zone Gamma-12</h4>
+                        <p class="text-cyan-400 text-sm font-medium mb-3">Peak Performance Window</p>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Yield Prediction:</span>
+                                <span class="text-white font-medium">Very High (97%)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Water Temp:</span>
+                                <span class="text-white font-medium">24.1°C</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Current:</span>
+                                <span class="text-white font-medium">Optimal</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="status-dot status-offline"></span>
+                            <span class="data-badge px-3 py-1 rounded-full">Restricted</span>
+                        </div>
+                        <h4 class="text-lg font-semibold text-white mb-2">Zone Delta-5</h4>
+                        <p class="text-red-400 text-sm font-medium mb-3">Conservation Area</p>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Status:</span>
+                                <span class="text-white font-medium">Protected</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Access:</span>
+                                <span class="text-white font-medium">Prohibited</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Reason:</span>
+                                <span class="text-white font-medium">Breeding Season</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ocean Data Section -->
+        <section id="weather" class="section min-h-screen py-12 px-6">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 class="text-4xl font-bold text-white mb-3">Oceanographic Intelligence Center</h2>
+                        <p class="text-slate-400 text-lg">Advanced environmental monitoring and predictive analysis</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="status-dot status-online"></span>
+                        <span class="text-slate-300 font-medium">Sensor Network: Online</span>
+                    </div>
+                </div>
+                
+                <!-- Current Conditions -->
+                <div class="glass-card rounded-2xl p-8 mb-8">
+                    <h3 class="text-2xl font-semibold text-white mb-8">Real-time Maritime Conditions</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="metric-card rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                    </svg>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">Optimal</span>
+                            </div>
+                            <h4 class="text-sm font-medium text-slate-400 mb-2">Sea Surface Temperature</h4>
+                            <p class="text-3xl text-white font-bold mb-1">22.4°C</p>
+                            <p class="text-xs text-cyan-400">+1.2°C from seasonal avg</p>
+                        </div>
+                        
+                        <div class="metric-card rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10m-10 0a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2"/>
+                                    </svg>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">Calm</span>
+                            </div>
+                            <h4 class="text-sm font-medium text-slate-400 mb-2">Wind Speed</h4>
+                            <p class="text-3xl text-white font-bold mb-1">8.2 kts</p>
+                            <p class="text-xs text-emerald-400">Favorable conditions</p>
+                        </div>
+                        
+                        <div class="metric-card rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">Ideal</span>
+                            </div>
+                            <h4 class="text-sm font-medium text-slate-400 mb-2">Wave Height</h4>
+                            <p class="text-3xl text-white font-bold mb-1">0.8m</p>
+                            <p class="text-xs text-emerald-400">Excellent for operations</p>
+                        </div>
+                        
+                        <div class="metric-card rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                                    </svg>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">Clear</span>
+                            </div>
+                            <h4 class="text-sm font-medium text-slate-400 mb-2">Visibility</h4>
+                            <p class="text-3xl text-white font-bold mb-1">15+ km</p>
+                            <p class="text-xs text-emerald-400">Excellent visibility</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Extended Forecast -->
+                <div class="glass-card rounded-2xl p-8">
+                    <div class="flex items-center justify-between mb-8">
+                        <h3 class="text-2xl font-semibold text-white">7-Day Maritime Forecast</h3>
+                        <div class="flex items-center space-x-2">
+                            <span class="status-dot status-online"></span>
+                            <span class="text-xs text-slate-400 font-medium">Updated every hour</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-7 gap-4">
+                        <div class="metric-card rounded-xl p-4 text-center">
+                            <p class="text-white font-semibold mb-3">Today</p>
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                </svg>
+                            </div>
+                            <p class="text-cyan-400 font-semibold mb-1">22°C</p>
+                            <p class="text-xs text-slate-400 mb-2">Clear skies</p>
+                            <span class="data-badge px-2 py-1 rounded text-xs">Optimal</span>
+                        </div>
+                        
+                        <div class="metric-card rounded-xl p-4 text-center">
+                            <p class="text-white font-semibold mb-3">Tomorrow</p>
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                                </svg>
+                            </div>
+                            <p class="text-cyan-400 font-semibold mb-1">20°C</p>
+                            <p class="text-xs text-slate-400 mb-2">Partly cloudy</p>
+                            <span class="data-badge px-2 py-1 rounded text-xs">Good</span>
+                        </div>
+                        
+                        <div class="metric-card rounded-xl p-4 text-center">
+                            <p class="text-white font-semibold mb-3">Wed</p>
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H16"/>
+                                </svg>
+                            </div>
+                            <p class="text-cyan-400 font-semibold mb-1">18°C</p>
+                            <p class="text-xs text-slate-400 mb-2">Light rain</p>
+                            <span class="data-badge px-2 py-1 rounded text-xs">Moderate</span>
+                        </div>
+                        
+                        <div class="metric-card rounded-xl p-4 text-center">
+                            <p class="text-white font-semibold mb-3">Thu</p>
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                            </div>
+                            <p class="text-cyan-400 font-semibold mb-1">16°C</p>
+                            <p class="text-xs text-slate-400 mb-2">Storms</p>
+                            <span class="data-badge px-2 py-1 rounded text-xs">Poor</span>
+                        </div>
+                        
+                        <div class="metric-card rounded-xl p-4 text-center">
+                            <p class="text-white font-semibold mb-3">Fri</p>
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                </svg>
+                            </div>
+                            <p class="text-cyan-400 font-semibold mb-1">24°C</p>
+                            <p class="text-xs text-slate-400 mb-2">Sunny</p>
+                            <span class="data-badge px-2 py-1 rounded text-xs">Excellent</span>
+                        </div>
+                        
+                        <div class="metric-card rounded-xl p-4 text-center">
+                            <p class="text-white font-semibold mb-3">Sat</p>
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                </svg>
+                            </div>
+                            <p class="text-cyan-400 font-semibold mb-1">26°C</p>
+                            <p class="text-xs text-slate-400 mb-2">Clear</p>
+                            <span class="data-badge px-2 py-1 rounded text-xs">Prime</span>
+                        </div>
+                        
+                        <div class="metric-card rounded-xl p-4 text-center">
+                            <p class="text-white font-semibold mb-3">Sun</p>
+                            <div class="ocean-icon w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                                </svg>
+                            </div>
+                            <p class="text-cyan-400 font-semibold mb-1">23°C</p>
+                            <p class="text-xs text-slate-400 mb-2">Overcast</p>
+                            <span class="data-badge px-2 py-1 rounded text-xs">Good</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Export Section -->
+        <section id="reports" class="section min-h-screen py-12 px-6">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 class="text-4xl font-bold text-white mb-3">Advanced Data Export Center</h2>
+                        <p class="text-slate-400 text-lg">Professional analytics reports and comprehensive datasets</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="status-dot status-online"></span>
+                        <span class="text-slate-300 font-medium">Export Service: Ready</span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="glass-card rounded-2xl p-8 text-center">
+                        <div class="ocean-icon w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4">Real-time Analytics</h3>
+                        <p class="text-slate-400 mb-6 text-sm leading-relaxed">Live catch predictions, performance metrics, and operational insights with ML confidence scores</p>
+                        <div class="flex items-center justify-between text-xs text-slate-500 mb-6 bg-slate-800/30 rounded-lg p-3">
+                            <span class="font-medium">CSV Format</span>
+                            <span class="data-badge px-2 py-1 rounded">3.2 MB</span>
+                        </div>
+                        <button onclick="downloadLiveData()" class="ocean-button w-full text-white font-semibold py-3 px-6 rounded-xl">
+                            <span class="relative z-10">Export Live Data</span>
+                        </button>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-8 text-center">
+                        <div class="ocean-icon w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4">Executive Summary</h3>
+                        <p class="text-slate-400 mb-6 text-sm leading-relaxed">Comprehensive weekly analysis with trend insights, ROI calculations, and strategic recommendations</p>
+                        <div class="flex items-center justify-between text-xs text-slate-500 mb-6 bg-slate-800/30 rounded-lg p-3">
+                            <span class="font-medium">PDF Report</span>
+                            <span class="data-badge px-2 py-1 rounded">8.7 MB</span>
+                        </div>
+                        <button onclick="downloadExecutiveReport()" class="ocean-button w-full text-white font-semibold py-3 px-6 rounded-xl">
+                            <span class="relative z-10">Generate Report</span>
+                        </button>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-8 text-center">
+                        <div class="ocean-icon w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4">ML Model Metrics</h3>
+                        <p class="text-slate-400 mb-6 text-sm leading-relaxed">AI accuracy statistics, validation datasets, model performance benchmarks and training logs</p>
+                        <div class="flex items-center justify-between text-xs text-slate-500 mb-6 bg-slate-800/30 rounded-lg p-3">
+                            <span class="font-medium">JSON Dataset</span>
+                            <span class="data-badge px-2 py-1 rounded">2.1 MB</span>
+                        </div>
+                        <button onclick="downloadMLMetrics()" class="ocean-button w-full text-white font-semibold py-3 px-6 rounded-xl">
+                            <span class="relative z-10">Download Metrics</span>
+                        </button>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-8 text-center">
+                        <div class="ocean-icon w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4">Environmental Data</h3>
+                        <p class="text-slate-400 mb-6 text-sm leading-relaxed">Oceanographic readings, weather patterns, temperature profiles and current analysis</p>
+                        <div class="flex items-center justify-between text-xs text-slate-500 mb-6 bg-slate-800/30 rounded-lg p-3">
+                            <span class="font-medium">Multi-format</span>
+                            <span class="data-badge px-2 py-1 rounded">12.4 MB</span>
+                        </div>
+                        <button onclick="downloadEnvironmentalData()" class="ocean-button w-full text-white font-semibold py-3 px-6 rounded-xl">
+                            <span class="relative z-10">Export Dataset</span>
+                        </button>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-8 text-center">
+                        <div class="ocean-icon w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4">Custom Analytics</h3>
+                        <p class="text-slate-400 mb-6 text-sm leading-relaxed">Build personalized reports with custom parameters, date ranges, and specific zone analysis</p>
+                        <div class="flex items-center justify-between text-xs text-slate-500 mb-6 bg-slate-800/30 rounded-lg p-3">
+                            <span class="font-medium">Configurable</span>
+                            <span class="data-badge px-2 py-1 rounded">Variable</span>
+                        </div>
+                        <button onclick="downloadCustomAnalytics()" class="ocean-button w-full text-white font-semibold py-3 px-6 rounded-xl">
+                            <span class="relative z-10">Configure Export</span>
+                        </button>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-8 text-center">
+                        <div class="ocean-icon w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4">Historical Archive</h3>
+                        <p class="text-slate-400 mb-6 text-sm leading-relaxed">Access comprehensive historical data, trend analysis, and long-term performance patterns</p>
+                        <div class="flex items-center justify-between text-xs text-slate-500 mb-6 bg-slate-800/30 rounded-lg p-3">
+                            <span class="font-medium">Archive Access</span>
+                            <span class="data-badge px-2 py-1 rounded">45+ GB</span>
+                        </div>
+                        <button onclick="downloadHistoricalArchive()" class="ocean-button w-full text-white font-semibold py-3 px-6 rounded-xl">
+                            <span class="relative z-10">Browse Archive</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- System Info Section -->
+        <section id="about" class="section min-h-screen py-12 px-6">
+            <div class="max-w-6xl mx-auto">
+                <div class="text-center mb-12">
+                    <h2 class="text-4xl font-bold text-white mb-4">AquaPredict System Information</h2>
+                    <p class="text-slate-400 text-lg">Advanced fisheries intelligence platform powered by cutting-edge technology</p>
+                </div>
+                
+                <!-- System Overview -->
+                <div class="glass-card rounded-2xl p-8 mb-8">
+                    <div class="flex items-start space-x-8">
+                        <div class="ocean-icon w-20 h-20 rounded-3xl flex items-center justify-center flex-shrink-0">
+                            <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-semibold text-white mb-6">Platform Architecture</h3>
+                            <p class="text-slate-300 leading-relaxed mb-6 text-lg">
+                                AquaPredict represents the next generation of fisheries management technology, integrating advanced machine learning algorithms, 
+                                real-time oceanographic sensors, and predictive analytics to revolutionize commercial fishing operations.
+                            </p>
+                            <p class="text-slate-300 leading-relaxed mb-6">
+                                Our platform processes over 10TB of environmental data daily, utilizing deep learning models trained on decades of 
+                                historical catch data, weather patterns, and marine ecosystem indicators to deliver precision forecasts with 96.7% accuracy.
+                            </p>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                                <div class="bg-slate-800/30 rounded-xl p-4">
+                                    <h4 class="text-cyan-400 font-semibold mb-2">AI/ML Engine</h4>
+                                    <p class="text-slate-400 text-sm">TensorFlow, PyTorch, Scikit-learn</p>
+                                </div>
+                                <div class="bg-slate-800/30 rounded-xl p-4">
+                                    <h4 class="text-cyan-400 font-semibold mb-2">Data Processing</h4>
+                                    <p class="text-slate-400 text-sm">Apache Kafka, Redis, PostgreSQL</p>
+                                </div>
+                                <div class="bg-slate-800/30 rounded-xl p-4">
+                                    <h4 class="text-cyan-400 font-semibold mb-2">Cloud Infrastructure</h4>
+                                    <p class="text-slate-400 text-sm">AWS, Docker, Kubernetes</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Metrics -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <div class="glass-card rounded-2xl p-8">
+                        <div class="flex items-center space-x-4 mb-8">
+                            <div class="ocean-icon w-14 h-14 rounded-2xl flex items-center justify-center">
+                                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-semibold text-white">System Performance</h3>
+                        </div>
+                        <div class="space-y-6">
+                            <div class="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl">
+                                <div>
+                                    <h4 class="font-semibold text-white">Ocean Tech Innovation Award 2024</h4>
+                                    <p class="text-sm text-cyan-400">🏆 Winner - Best AI Implementation</p>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">1st Place</span>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl">
+                                <div>
+                                    <h4 class="font-semibold text-white">Blue Economy Challenge</h4>
+                                    <p class="text-sm text-cyan-400">🌊 Sustainability Excellence</p>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">Finalist</span>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl">
+                                <div>
+                                    <h4 class="font-semibold text-white">Maritime Tech Summit</h4>
+                                    <p class="text-sm text-cyan-400">⚡ Innovation Showcase</p>
+                                </div>
+                                <span class="data-badge px-3 py-1 rounded-full">Featured</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card rounded-2xl p-8">
+                        <div class="flex items-center space-x-4 mb-8">
+                            <div class="ocean-icon w-14 h-14 rounded-2xl flex items-center justify-center">
+                                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-semibold text-white">Key Metrics</h3>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="text-center p-4 bg-slate-800/30 rounded-xl">
+                                <div class="text-3xl font-bold gradient-text mb-2">96.7%</div>
+                                <div class="text-xs text-slate-400 font-medium">Prediction Accuracy</div>
+                            </div>
+                            <div class="text-center p-4 bg-slate-800/30 rounded-xl">
+                                <div class="text-3xl font-bold gradient-text mb-2">+28%</div>
+                                <div class="text-xs text-slate-400 font-medium">Revenue Increase</div>
+                            </div>
+                            <div class="text-center p-4 bg-slate-800/30 rounded-xl">
+                                <div class="text-3xl font-bold gradient-text mb-2">47</div>
+                                <div class="text-xs text-slate-400 font-medium">Active Zones</div>
+                            </div>
+                            <div class="text-center p-4 bg-slate-800/30 rounded-xl">
+                                <div class="text-3xl font-bold gradient-text mb-2">24/7</div>
+                                <div class="text-xs text-slate-400 font-medium">Monitoring</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Development Team -->
+                <div class="glass-card rounded-2xl p-8">
+                    <div class="flex items-center space-x-4 mb-8">
+                        <div class="ocean-icon w-14 h-14 rounded-2xl flex items-center justify-center">
+                            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">Expert Development Team</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div class="metric-card rounded-2xl p-6 text-center">
+                            <div class="ocean-icon w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                                </svg>
+                            </div>
+                            <h4 class="text-lg font-semibold text-white mb-3">Powered By</h4>
+                            <p class="gradient-text font-semibold mb-2">Simply Scripters</p>
+                            <p class="text-slate-400 text-sm leading-relaxed">simplyscripters@gmail.com</p>
+                        </div>
+                        
+                        <div class="metric-card rounded-2xl p-6 text-center">
+                            <div class="ocean-icon w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                </svg>
+                            </div>
+                            <h4 class="text-lg font-semibold text-white mb-3">www.linkedin.com/in/shathak</h4>
+                            <p class="gradient-text font-semibold mb-2">+91 7339186564</p>
+                            <p class="text-slate-400 text-sm leading-relaxed">https://github.com/MohamedShathakathulla/Sathak || simplysathak@gmail.com</p>
+                        </div>
+                        
+                        <div class="metric-card rounded-2xl p-6 text-center">
+                            <div class="ocean-icon w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z"/>
+                                </svg>
+                            </div>
+                            <h4 class="text-lg font-semibold text-white mb-3">Foundation</h4>
+                            <p class="gradient-text font-semibold mb-2">St Joseph's College Engineering</p>
+                            <p class="text-slate-400 text-sm leading-relaxed">OMR Chennai - 119 Phone:044 - 24501060, 24501449</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Navigation functionality
+        function showSection(sectionId) {
+            // Hide all sections
+            const sections = document.querySelectorAll('.section');
+            sections.forEach(section => section.classList.remove('active'));
+            
+            // Show selected section
+            document.getElementById(sectionId).classList.add('active');
+            
+            // Update nav items
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => item.classList.remove('active'));
+            
+            // Close mobile menu
+            document.getElementById('mobileMenu').classList.add('hidden');
+            
+            // Initialize charts if analytics is shown
+            if (sectionId === 'analytics') {
+                setTimeout(initCharts, 100);
+            }
+        }
+
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobileMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Chart initialization with ocean theme
+        function initCharts() {
+            // Weekly Chart
+            const weeklyCtx = document.getElementById('weeklyChart');
+            if (weeklyCtx && !weeklyCtx.chart) {
+                weeklyCtx.chart = new Chart(weeklyCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                        datasets: [{
+                            label: 'Predicted Catch (kg)',
+                            data: [1420, 1680, 1250, 1890, 2100, 2340, 1847],
+                            borderColor: '#06b6d4',
+                            backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointBackgroundColor: '#06b6d4',
+                            pointBorderColor: '#0891b2',
+                            pointBorderWidth: 2,
+                            pointRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#e2e8f0',
+                                    font: {
+                                        family: 'Inter',
+                                        weight: '500'
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                ticks: {
+                                    color: '#cbd5e1',
+                                    font: {
+                                        family: 'Inter'
+                                    }
+                                },
+                                grid: {
+                                    color: 'rgba(6, 182, 212, 0.1)'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#cbd5e1',
+                                    font: {
+                                        family: 'Inter'
+                                    }
+                                },
+                                grid: {
+                                    color: 'rgba(6, 182, 212, 0.1)'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Species Chart
+            const speciesCtx = document.getElementById('speciesChart');
+            if (speciesCtx && !speciesCtx.chart) {
+                speciesCtx.chart = new Chart(speciesCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Tuna', 'Salmon', 'Cod', 'Mackerel', 'Sardines', 'Others'],
+                        datasets: [{
+                            data: [28, 22, 18, 14, 10, 8],
+                            backgroundColor: [
+                                '#06b6d4',
+                                '#0891b2',
+                                '#0e7490',
+                                '#155e75',
+                                '#164e63',
+                                '#0c4a6e'
+                            ],
+                            borderWidth: 2,
+                            borderColor: 'rgba(15, 23, 42, 0.8)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    color: '#e2e8f0',
+                                    font: {
+                                        family: 'Inter',
+                                        weight: '500'
+                                    },
+                                    padding: 20
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Initialize zone charts
+            initZoneCharts();
+        }
+        
+        // Zone-specific chart initialization
+        function initZoneCharts() {
+            // Performance Bar Chart
+            const performanceCtx = document.getElementById('performanceBarChart');
+            if (performanceCtx && !performanceCtx.chart) {
+                performanceCtx.chart = new Chart(performanceCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Zone A-7', 'Zone B-3', 'Zone C-12', 'Zone D-5', 'Zone E-9', 'Zone F-1'],
+                        datasets: [{
+                            label: 'Catch Performance (kg)',
+                            data: [2840, 2410, 1950, 1520, 1280, 840],
+                            backgroundColor: [
+                                '#06b6d4',
+                                '#0891b2',
+                                '#0e7490',
+                                '#155e75',
+                                '#164e63',
+                                '#0c4a6e'
+                            ],
+                            borderColor: '#06b6d4',
+                            borderWidth: 1,
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: '#cbd5e1',
+                                    font: { family: 'Inter' }
+                                },
+                                grid: { color: 'rgba(6, 182, 212, 0.1)' }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#cbd5e1',
+                                    font: { family: 'Inter' }
+                                },
+                                grid: { color: 'rgba(6, 182, 212, 0.1)' }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Accuracy Gauge Chart
+            const accuracyCtx = document.getElementById('accuracyGaugeChart');
+            if (accuracyCtx && !accuracyCtx.chart) {
+                accuracyCtx.chart = new Chart(accuracyCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Accuracy', 'Remaining'],
+                        datasets: [{
+                            data: [96.7, 3.3],
+                            backgroundColor: ['#06b6d4', 'rgba(15, 23, 42, 0.3)'],
+                            borderWidth: 0,
+                            cutout: '75%'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    },
+                    plugins: [{
+                        beforeDraw: function(chart) {
+                            const width = chart.width;
+                            const height = chart.height;
+                            const ctx = chart.ctx;
+                            
+                            ctx.restore();
+                            const fontSize = (height / 114).toFixed(2);
+                            ctx.font = fontSize + "em Inter";
+                            ctx.textBaseline = "middle";
+                            ctx.fillStyle = "#06b6d4";
+                            
+                            const text = "96.7%";
+                            const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                            const textY = height / 2;
+                            
+                            ctx.fillText(text, textX, textY);
+                            ctx.save();
+                        }
+                    }]
+                });
+            }
+            
+            // Species Pie Chart
+            const speciesPieCtx = document.getElementById('speciesPieChart');
+            if (speciesPieCtx && !speciesPieCtx.chart) {
+                speciesPieCtx.chart = new Chart(speciesPieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Tuna', 'Salmon', 'Cod', 'Mackerel', 'Sardines', 'Others'],
+                        datasets: [{
+                            data: [28, 22, 18, 14, 10, 8],
+                            backgroundColor: [
+                                '#06b6d4',
+                                '#3b82f6',
+                                '#10b981',
+                                '#8b5cf6',
+                                '#f59e0b',
+                                '#f97316'
+                            ],
+                            borderWidth: 2,
+                            borderColor: 'rgba(15, 23, 42, 0.8)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: '#e2e8f0',
+                                    font: { family: 'Inter', weight: '500' },
+                                    padding: 15
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Trends Line Chart
+            const trendsCtx = document.getElementById('trendsLineChart');
+            if (trendsCtx && !trendsCtx.chart) {
+                trendsCtx.chart = new Chart(trendsCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                        datasets: [{
+                            label: 'Catch Volume (tons)',
+                            data: [45, 52, 48, 61, 58, 67, 72, 69, 64, 58, 51, 47],
+                            borderColor: '#06b6d4',
+                            backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y'
+                        }, {
+                            label: 'Water Temperature (°C)',
+                            data: [18, 19, 20, 22, 24, 26, 28, 27, 25, 23, 21, 19],
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            tension: 0.4,
+                            fill: false,
+                            yAxisID: 'y1'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#e2e8f0',
+                                    font: { family: 'Inter', weight: '500' }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: { color: '#cbd5e1', font: { family: 'Inter' } },
+                                grid: { color: 'rgba(6, 182, 212, 0.1)' }
+                            },
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                ticks: { color: '#cbd5e1', font: { family: 'Inter' } },
+                                grid: { color: 'rgba(6, 182, 212, 0.1)' }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                ticks: { color: '#f59e0b', font: { family: 'Inter' } },
+                                grid: { drawOnChartArea: false }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Initialize live map
+            updateLiveMapCoordinates();
+        }
+        
+        // Chart switching functionality
+        function switchChart(chartType) {
+            // Hide all panels
+            document.querySelectorAll('.chart-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.chart-tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected panel and activate button
+            document.getElementById(`chart-${chartType}`).classList.add('active');
+            document.getElementById(`btn-${chartType}`).classList.add('active');
+            
+            // Initialize charts if needed
+            setTimeout(() => {
+                if (chartType === 'livemap' || chartType === 'species' || chartType === 'trends' || chartType === 'performance') {
+                    initZoneCharts();
+                }
+                if (chartType === 'livemap') {
+                    updateLiveMapCoordinates();
+                }
+            }, 100);
+        }
+        
+        // Update live map coordinates based on user input
+        function updateLiveMapCoordinates() {
+            const lat = document.getElementById('lat').value || '69.6';
+            const lon = document.getElementById('lon').value || '18.9';
+            const mapCoordinates = document.getElementById('mapCoordinates');
+            
+            if (mapCoordinates) {
+                mapCoordinates.textContent = `${parseFloat(lat).toFixed(1)}°N, ${parseFloat(lon).toFixed(1)}°E`;
+            }
+            
+            // Simulate vessel movement based on coordinates
+            animateVessels();
+        }
+        
+        // Animate vessel markers for realistic movement
+        function animateVessels() {
+            const vessels = document.querySelectorAll('.vessel-marker');
+            vessels.forEach((vessel, index) => {
+                // Add slight random movement to simulate real vessel tracking
+                const randomX = (Math.random() - 0.5) * 20;
+                const randomY = (Math.random() - 0.5) * 20;
+                
+                setTimeout(() => {
+                    vessel.style.transform = `translate(${randomX}px, ${randomY}px)`;
+                    
+                    // Reset position after animation
+                    setTimeout(() => {
+                        vessel.style.transform = 'translate(0px, 0px)';
+                    }, 2000);
+                }, index * 500);
+            });
+        }
+
+        // Smart prediction system based on user inputs
+        function updatePredictions() {
+            const year = document.getElementById('year').value;
+            const country = document.getElementById('country').value;
+            const gear = document.getElementById('gear').value;
+            const lat = parseFloat(document.getElementById('lat').value);
+            const lon = parseFloat(document.getElementById('lon').value);
+            
+            // Update status to processing
+            const status = document.getElementById('configStatus');
+            status.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <span class="status-dot status-warning"></span>
+                    <span class="text-slate-300 font-medium">Processing Configuration...</span>
+                    <span class="data-badge px-3 py-1 rounded-full ml-auto">Analyzing</span>
+                </div>
+            `;
+            
+            // Simulate AI processing delay
+            setTimeout(() => {
+                // Calculate predictions based on inputs
+                const predictions = calculatePredictions(year, country, gear, lat, lon);
+                
+                // Update all relevant displays
+                updateDashboardMetrics(predictions);
+                updateZoneInformation(predictions, lat, lon, gear);
+                updateChartData(predictions);
+                
+                // Update status to complete
+                status.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <span class="status-dot status-online"></span>
+                        <span class="text-slate-300 font-medium">Analysis Complete - ${country} ${year} (${gear})</span>
+                        <span class="data-badge px-3 py-1 rounded-full ml-auto">Updated</span>
+                    </div>
+                `;
+                
+                // Show success message
+                showNotification(`🎯 Predictions updated for ${country} ${year} using ${gear} gear!`, country);
+                
+            }, 1500);
+        }
+        
+        function calculatePredictions(year, country, gear, lat, lon) {
+            // Simulate AI-based calculations with realistic variations
+            const baseYield = 1500;
+            const countryMultiplier = getCountryMultiplier(country);
+            const gearMultiplier = getGearMultiplier(gear);
+            const locationMultiplier = getLocationMultiplier(lat, lon);
+            const yearMultiplier = getYearMultiplier(year);
+            
+            const dailyCatch = Math.round(baseYield * countryMultiplier * gearMultiplier * locationMultiplier * yearMultiplier);
+            const confidence = Math.min(95, Math.max(75, 85 + Math.random() * 15));
+            const trend = (Math.random() - 0.5) * 30; // -15% to +15%
+            
+            return {
+                dailyCatch,
+                confidence,
+                trend,
+                country,
+                gear,
+                year,
+                lat,
+                lon
+            };
+        }
+        
+        function getCountryMultiplier(country) {
+            const multipliers = {
+                'norway': 1.3,
+                'iceland': 1.2,
+                'canada': 1.1,
+                'alaska': 1.25,
+                'scotland': 1.0,
+                'finland': 1.15,
+                'sweden': 1.1,
+                'denmark': 1.05,
+                'greenland': 1.4,
+                'faroe islands': 1.35,
+                'india': 1.05,
+                'japan': 0.9,
+                'chile': 0.95,
+                'new zealand': 1.0,
+                'australia': 0.85,
+                'russia': 1.2,
+                'united kingdom': 0.95,
+                'ireland': 1.0,
+                'portugal': 0.9,
+                'spain': 0.85,
+                'france': 0.8
+            };
+            return multipliers[country.toLowerCase()] || 1.0;
+        }
+        
+        function getGearMultiplier(gear) {
+            const multipliers = {
+                'Trawl': 1.2,
+                'Longline': 0.9,
+                'Gillnet': 1.0,
+                'Purse Seine': 1.4,
+                'Trap': 0.8
+            };
+            return multipliers[gear] || 1.0;
+        }
+        
+        function getLocationMultiplier(lat, lon) {
+            // Simulate better fishing in certain latitude ranges
+            const absLat = Math.abs(lat);
+            if (absLat > 60) return 1.3; // Arctic/Antarctic waters
+            if (absLat > 40) return 1.1; // Temperate waters
+            return 0.9; // Tropical waters
+        }
+        
+        function getYearMultiplier(year) {
+            // Simulate climate change effects
+            const baseYear = 2020;
+            const yearDiff = year - baseYear;
+            return 1.0 + (yearDiff * 0.02); // 2% change per year
+        }
+        
+        function updateDashboardMetrics(predictions) {
+            document.getElementById('dailyCatch').textContent = `${predictions.dailyCatch.toLocaleString()} kg`;
+            
+            const trendElement = document.getElementById('catchTrend');
+            const trendValue = predictions.trend.toFixed(1);
+            const trendSymbol = predictions.trend >= 0 ? '↗' : '↘';
+            const trendColor = predictions.trend >= 0 ? 'text-emerald-400' : 'text-red-400';
+            
+            trendElement.className = trendColor;
+            trendElement.textContent = `${trendSymbol} ${trendValue > 0 ? '+' : ''}${trendValue}%`;
+        }
+        
+        function updateZoneInformation(predictions, lat, lon, gear) {
+            document.getElementById('zoneLocation').textContent = `${lat.toFixed(1)}°N, ${lon.toFixed(1)}°E`;
+            
+            const gearCompatibility = getGearCompatibility(gear);
+            document.getElementById('gearMatch').textContent = gearCompatibility;
+            
+            // Update zone name based on location
+            const zoneName = generateZoneName(lat, lon);
+            document.getElementById('primaryZone').textContent = zoneName;
+        }
+        
+        function getGearCompatibility(gear) {
+            const ratings = {
+                'Trawl': 'Excellent',
+                'Longline': 'Very Good',
+                'Gillnet': 'Good',
+                'Purse Seine': 'Excellent',
+                'Trap': 'Moderate'
+            };
+            return ratings[gear] || 'Good';
+        }
+        
+        function generateZoneName(lat, lon) {
+            const zones = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'];
+            const zoneIndex = Math.floor(Math.abs(lat + lon) % zones.length);
+            const sectorNumber = Math.floor(Math.abs(lat * lon) % 20) + 1;
+            return `Zone ${zones[zoneIndex]}-${sectorNumber}`;
+        }
+        
+        function updateChartData(predictions) {
+            // Update charts with new prediction data if they exist
+            if (typeof Chart !== 'undefined') {
+                setTimeout(() => {
+                    // Update Analytics charts
+                    const weeklyCtx = document.getElementById('weeklyChart');
+                    if (weeklyCtx && weeklyCtx.chart) {
+                        const baseValue = predictions.dailyCatch;
+                        const newData = Array.from({length: 7}, () => 
+                            Math.round(baseValue * (0.8 + Math.random() * 0.4))
+                        );
+                        weeklyCtx.chart.data.datasets[0].data = newData;
+                        weeklyCtx.chart.update();
+                    }
+                    
+                    // Update Fishing Zones charts
+                    updateZoneCharts(predictions);
+                    
+                    // Update live map
+                    updateLiveMapData(predictions);
+                    
+                }, 100);
+            }
+        }
+        
+        function updateZoneCharts(predictions) {
+            const baseValue = predictions.dailyCatch;
+            
+            // Update Performance Bar Chart
+            const performanceCtx = document.getElementById('performanceBarChart');
+            if (performanceCtx && performanceCtx.chart) {
+                const newData = Array.from({length: 6}, () => 
+                    Math.round(baseValue * (0.6 + Math.random() * 0.8))
+                );
+                performanceCtx.chart.data.datasets[0].data = newData;
+                
+                // Randomize colors based on performance
+                const colors = newData.map(value => {
+                    if (value > baseValue * 1.2) return '#10b981'; // Green for high performance
+                    if (value > baseValue * 0.9) return '#06b6d4'; // Cyan for good performance
+                    if (value > baseValue * 0.7) return '#f59e0b'; // Amber for moderate performance
+                    return '#ef4444'; // Red for low performance
+                });
+                performanceCtx.chart.data.datasets[0].backgroundColor = colors;
+                performanceCtx.chart.update();
+            }
+            
+            // Update Accuracy Gauge Chart
+            const accuracyCtx = document.getElementById('accuracyGaugeChart');
+            if (accuracyCtx && accuracyCtx.chart) {
+                const newAccuracy = Math.max(75, Math.min(99, predictions.confidence + (Math.random() - 0.5) * 10));
+                accuracyCtx.chart.data.datasets[0].data = [newAccuracy, 100 - newAccuracy];
+                accuracyCtx.chart.update();
+            }
+            
+            // Update Species Pie Chart
+            const speciesPieCtx = document.getElementById('speciesPieChart');
+            if (speciesPieCtx && speciesPieCtx.chart) {
+                const newSpeciesData = Array.from({length: 6}, () => 
+                    Math.round(5 + Math.random() * 25)
+                );
+                // Normalize to 100%
+                const total = newSpeciesData.reduce((a, b) => a + b, 0);
+                const normalizedData = newSpeciesData.map(value => Math.round((value / total) * 100));
+                
+                speciesPieCtx.chart.data.datasets[0].data = normalizedData;
+                speciesPieCtx.chart.update();
+            }
+            
+            // Update Trends Line Chart
+            const trendsCtx = document.getElementById('trendsLineChart');
+            if (trendsCtx && trendsCtx.chart) {
+                const catchData = Array.from({length: 12}, () => 
+                    Math.round(30 + Math.random() * 50)
+                );
+                const tempData = Array.from({length: 12}, () => 
+                    Math.round(15 + Math.random() * 15)
+                );
+                
+                trendsCtx.chart.data.datasets[0].data = catchData;
+                trendsCtx.chart.data.datasets[1].data = tempData;
+                trendsCtx.chart.update();
+            }
+        }
+        
+        function updateLiveMapData(predictions) {
+            // Update vessel positions randomly
+            const vessels = document.querySelectorAll('.vessel-marker');
+            vessels.forEach((vessel, index) => {
+                const randomX = (Math.random() - 0.5) * 100;
+                const randomY = (Math.random() - 0.5) * 80;
+                
+                setTimeout(() => {
+                    vessel.style.transform = `translate(${randomX}px, ${randomY}px)`;
+                    vessel.style.transition = 'transform 1s ease-in-out';
+                }, index * 200);
+            });
+            
+            // Update zone colors based on predictions
+            const zones = document.querySelectorAll('[class*="Zone"]');
+            zones.forEach(zone => {
+                const performance = Math.random();
+                let borderColor, bgColor, textColor;
+                
+                if (performance > 0.8) {
+                    borderColor = 'border-emerald-400';
+                    bgColor = 'bg-emerald-400/30';
+                    textColor = 'text-emerald-400';
+                } else if (performance > 0.6) {
+                    borderColor = 'border-cyan-400';
+                    bgColor = 'bg-cyan-400/30';
+                    textColor = 'text-cyan-400';
+                } else if (performance > 0.4) {
+                    borderColor = 'border-amber-400';
+                    bgColor = 'bg-amber-400/30';
+                    textColor = 'text-amber-400';
+                } else {
+                    borderColor = 'border-red-400';
+                    bgColor = 'bg-red-400/30';
+                    textColor = 'text-red-400';
+                }
+                
+                // Update zone styling
+                zone.className = `absolute rounded-lg flex items-center justify-center border-2 ${borderColor} ${bgColor}`;
+                const zoneText = zone.querySelector('span');
+                if (zoneText) {
+                    zoneText.className = `text-xs font-bold ${textColor}`;
+                }
+            });
+            
+            // Update coordinates display
+            updateLiveMapCoordinates();
+            
+            // Add some visual feedback
+            const liveIndicator = document.querySelector('#liveMapContainer .absolute.top-2.right-2');
+            if (liveIndicator) {
+                liveIndicator.style.animation = 'pulse 0.5s ease-in-out 3';
+            }
+        }
+        
+        function showNotification(message, country = '') {
+            // Get country flag emoji
+            const countryFlags = {
+                'norway': '🇳🇴',
+                'iceland': '🇮🇸', 
+                'canada': '🇨🇦',
+                'alaska': '🇺🇸',
+                'scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+                'india': '🇮🇳',
+                'japan': '🇯🇵',
+                'chile': '🇨🇱',
+                'finland': '🇫🇮',
+                'sweden': '🇸🇪',
+                'denmark': '🇩🇰',
+                'greenland': '🇬🇱',
+                'faroe islands': '🇫🇴',
+                'new zealand': '🇳🇿',
+                'australia': '🇦🇺',
+                'russia': '🇷🇺',
+                'united kingdom': '🇬🇧',
+                'ireland': '🇮🇪',
+                'portugal': '🇵🇹',
+                'spain': '🇪🇸',
+                'france': '🇫🇷'
+            };
+            
+            const flag = countryFlags[country.toLowerCase()] || '🌊';
+            
+            // Create and show a temporary notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-20 right-6 glass-card rounded-xl p-4 z-50 transform translate-x-full transition-transform duration-300';
+            notification.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">${flag}</span>
+                    <span class="status-dot status-online"></span>
+                    <span class="text-white font-medium">${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Slide in
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Slide out and remove
+            setTimeout(() => {
+                notification.style.transform = 'translateX(full)';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // Download Functions
+        function downloadLiveData() {
+            const country = document.getElementById('country').value || 'Norway';
+            const gear = document.getElementById('gear').value || 'Trawl';
+            const year = document.getElementById('year').value || '2024';
+            const lat = document.getElementById('lat').value || '69.6';
+            const lon = document.getElementById('lon').value || '18.9';
+            
+            // Generate random live data
+            const csvData = generateLiveDataCSV(country, gear, year, lat, lon);
+            downloadFile(csvData, `AquaPredict_LiveData_${country}_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+            showNotification(`📊 Live data exported for ${country}!`, country);
+        }
+        
+        function downloadExecutiveReport() {
+            const country = document.getElementById('country').value || 'Norway';
+            const reportData = generateExecutiveReport(country);
+            downloadFile(reportData, `AquaPredict_Executive_Report_${country}_${new Date().toISOString().split('T')[0]}.pdf`, 'application/pdf');
+            showNotification(`📋 Executive report generated for ${country}!`, country);
+        }
+        
+        function downloadMLMetrics() {
+            const country = document.getElementById('country').value || 'Norway';
+            const metricsData = generateMLMetrics(country);
+            downloadFile(metricsData, `AquaPredict_ML_Metrics_${country}_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+            showNotification(`🤖 ML metrics exported for ${country}!`, country);
+        }
+        
+        function downloadEnvironmentalData() {
+            const country = document.getElementById('country').value || 'Norway';
+            const envData = generateEnvironmentalData(country);
+            downloadFile(envData, `AquaPredict_Environmental_${country}_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+            showNotification(`🌊 Environmental data exported for ${country}!`, country);
+        }
+        
+        function downloadCustomAnalytics() {
+            const country = document.getElementById('country').value || 'Norway';
+            const customData = generateCustomAnalytics(country);
+            downloadFile(customData, `AquaPredict_Custom_Analytics_${country}_${new Date().toISOString().split('T')[0]}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            showNotification(`⚙️ Custom analytics configured for ${country}!`, country);
+        }
+        
+        function downloadHistoricalArchive() {
+            const country = document.getElementById('country').value || 'Norway';
+            const archiveData = generateHistoricalArchive(country);
+            downloadFile(archiveData, `AquaPredict_Historical_Archive_${country}_${new Date().toISOString().split('T')[0]}.zip`, 'application/zip');
+            showNotification(`📚 Historical archive accessed for ${country}!`, country);
+        }
+        
+        function generateLiveDataCSV(country, gear, year, lat, lon) {
+            const headers = ['Timestamp', 'Country', 'Gear_Type', 'Latitude', 'Longitude', 'Predicted_Catch_kg', 'Confidence_%', 'Water_Temp_C', 'Wind_Speed_kts', 'Wave_Height_m', 'Species_Primary', 'Zone_ID'];
+            
+            let csvContent = headers.join(',') + '\n';
+            
+            // Generate 50 random data points
+            for (let i = 0; i < 50; i++) {
+                const timestamp = new Date(Date.now() - (i * 3600000)).toISOString();
+                const catchPrediction = Math.round(1200 + Math.random() * 1600);
+                const confidence = Math.round(75 + Math.random() * 20);
+                const waterTemp = (18 + Math.random() * 8).toFixed(1);
+                const windSpeed = (5 + Math.random() * 15).toFixed(1);
+                const waveHeight = (0.5 + Math.random() * 2).toFixed(1);
+                const species = ['Tuna', 'Salmon', 'Cod', 'Mackerel', 'Sardines'][Math.floor(Math.random() * 5)];
+                const zoneId = `${country.substring(0,3).toUpperCase()}-${Math.floor(Math.random() * 99) + 1}`;
+                
+                const row = [
+                    timestamp,
+                    country,
+                    gear,
+                    parseFloat(lat) + (Math.random() - 0.5) * 2,
+                    parseFloat(lon) + (Math.random() - 0.5) * 2,
+                    catchPrediction,
+                    confidence,
+                    waterTemp,
+                    windSpeed,
+                    waveHeight,
+                    species,
+                    zoneId
+                ].join(',');
+                
+                csvContent += row + '\n';
+            }
+            
+            return csvContent;
+        }
+        
+        function generateExecutiveReport(country) {
+            return `%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents 4 0 R
+>>
+endobj
+
+4 0 obj
+<<
+/Length 200
+>>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+(AquaPredict Executive Report - ${country}) Tj
+0 -20 Td
+(Generated: ${new Date().toLocaleDateString()}) Tj
+0 -20 Td
+(Prediction Accuracy: ${(85 + Math.random() * 15).toFixed(1)}%) Tj
+0 -20 Td
+(Revenue Impact: +${(20 + Math.random() * 15).toFixed(1)}%) Tj
+0 -20 Td
+(Active Zones: ${Math.floor(30 + Math.random() * 30)}) Tj
+ET
+endstream
+endobj
+
+xref
+0 5
+0000000000 65535 f 
+0000000010 00000 n 
+0000000053 00000 n 
+0000000110 00000 n 
+0000000205 00000 n 
+trailer
+<<
+/Size 5
+/Root 1 0 R
+>>
+startxref
+456
+%%EOF`;
+        }
+        
+        function generateMLMetrics(country) {
+            return JSON.stringify({
+                "report_metadata": {
+                    "country": country,
+                    "generated_at": new Date().toISOString(),
+                    "model_version": "v2.4.1",
+                    "data_points_analyzed": Math.floor(50000 + Math.random() * 100000)
+                },
+                "model_performance": {
+                    "accuracy": (85 + Math.random() * 15).toFixed(2),
+                    "precision": (82 + Math.random() * 15).toFixed(2),
+                    "recall": (88 + Math.random() * 10).toFixed(2),
+                    "f1_score": (85 + Math.random() * 12).toFixed(2),
+                    "rmse": (0.15 + Math.random() * 0.1).toFixed(3)
+                },
+                "feature_importance": {
+                    "water_temperature": (0.25 + Math.random() * 0.1).toFixed(3),
+                    "seasonal_patterns": (0.22 + Math.random() * 0.08).toFixed(3),
+                    "gear_type": (0.18 + Math.random() * 0.07).toFixed(3),
+                    "location_coordinates": (0.15 + Math.random() * 0.05).toFixed(3),
+                    "weather_conditions": (0.12 + Math.random() * 0.05).toFixed(3),
+                    "historical_trends": (0.08 + Math.random() * 0.04).toFixed(3)
+                },
+                "validation_results": {
+                    "cross_validation_score": (0.89 + Math.random() * 0.08).toFixed(3),
+                    "test_set_accuracy": (0.91 + Math.random() * 0.06).toFixed(3),
+                    "training_time_minutes": Math.floor(45 + Math.random() * 30),
+                    "last_retrained": new Date(Date.now() - Math.random() * 7 * 24 * 3600000).toISOString()
+                }
+            }, null, 2);
+        }
+        
+        function generateEnvironmentalData(country) {
+            const headers = ['Timestamp', 'Country', 'Sea_Surface_Temp_C', 'Salinity_ppt', 'pH_Level', 'Dissolved_Oxygen_mg_L', 'Chlorophyll_mg_m3', 'Current_Speed_m_s', 'Current_Direction_deg', 'Tide_Height_m', 'Barometric_Pressure_hPa'];
+            
+            let csvContent = headers.join(',') + '\n';
+            
+            for (let i = 0; i < 100; i++) {
+                const timestamp = new Date(Date.now() - (i * 1800000)).toISOString();
+                const seaTemp = (15 + Math.random() * 12).toFixed(2);
+                const salinity = (32 + Math.random() * 6).toFixed(1);
+                const pH = (7.8 + Math.random() * 0.6).toFixed(2);
+                const oxygen = (6 + Math.random() * 4).toFixed(1);
+                const chlorophyll = (0.5 + Math.random() * 2).toFixed(2);
+                const currentSpeed = (0.1 + Math.random() * 1.5).toFixed(2);
+                const currentDir = Math.floor(Math.random() * 360);
+                const tideHeight = (-2 + Math.random() * 4).toFixed(2);
+                const pressure = (1000 + Math.random() * 50).toFixed(1);
+                
+                const row = [
+                    timestamp,
+                    country,
+                    seaTemp,
+                    salinity,
+                    pH,
+                    oxygen,
+                    chlorophyll,
+                    currentSpeed,
+                    currentDir,
+                    tideHeight,
+                    pressure
+                ].join(',');
+                
+                csvContent += row + '\n';
+            }
+            
+            return csvContent;
+        }
+        
+        function generateCustomAnalytics(country) {
+            return `PK\x03\x04\x14\x00\x00\x00\x08\x00Custom Analytics Data for ${country}\nGenerated: ${new Date().toISOString()}\nCustom Parameters Applied\nData Range: Last 30 Days\nAnalysis Type: Comprehensive\nZones Analyzed: ${Math.floor(20 + Math.random() * 30)}\nPrediction Models: Advanced ML\nConfidence Level: ${(90 + Math.random() * 8).toFixed(1)}%`;
+        }
+        
+        function generateHistoricalArchive(country) {
+            return `PK\x03\x04\x14\x00\x00\x00\x08\x00Historical Archive Access for ${country}\nArchive Period: 2015-2024\nTotal Records: ${Math.floor(500000 + Math.random() * 1000000).toLocaleString()}\nData Types: Catch Records, Environmental Data, Weather Patterns\nFile Formats: CSV, JSON, XML\nCompression: ZIP\nSize: ${(40 + Math.random() * 20).toFixed(1)} GB\nLast Updated: ${new Date().toISOString()}`;
+        }
+        
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set first nav item as active
+            const firstNavItem = document.querySelector('.nav-item');
+            if (firstNavItem) {
+                firstNavItem.classList.add('active');
+            }
+            
+            // Initialize charts if analytics is active
+            if (document.getElementById('analytics').classList.contains('active')) {
+                setTimeout(initCharts, 100);
+            }
+            
+            // Run initial prediction with default values
+            setTimeout(updatePredictions, 500);
+        });
+    </script>
+</body>
+</html>
